@@ -1,0 +1,6 @@
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),{DatabaseSync}=require('node:sqlite');
+const root=__dirname,dist=path.join(root,'dist'),db=new DatabaseSync(path.join(root,'prompt-master.db'));
+db.exec('CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)');
+const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.png':'image/png','.css':'text/css'};
+const server=http.createServer((req,res)=>{if(req.url==='/api/data'){if(req.method==='GET'){const r=db.prepare('SELECT data FROM app_state WHERE id=1').get();res.writeHead(200,{'Content-Type':'application/json'});res.end(r?.data||'{}')}else if(req.method==='POST'){let b='';req.on('data',x=>b+=x);req.on('end',()=>{JSON.parse(b);db.prepare('INSERT INTO app_state(id,data) VALUES(1,?) ON CONFLICT(id) DO UPDATE SET data=excluded.data,updated_at=CURRENT_TIMESTAMP').run(b);res.writeHead(204);res.end()})}return}let p=decodeURIComponent(req.url.split('?')[0]);if(p==='/')p='/index.html';let f=path.join(dist,p);if(!f.startsWith(dist)||!fs.existsSync(f))return res.writeHead(404).end();res.writeHead(200,{'Content-Type':mime[path.extname(f)]||'application/octet-stream'});fs.createReadStream(f).pipe(res)});
+server.listen(8765,'127.0.0.1',()=>console.log('Prompt Master: http://127.0.0.1:8765'));
